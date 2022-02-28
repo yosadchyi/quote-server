@@ -1,17 +1,14 @@
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpListener, TcpStream};
-
 use std::env;
 use std::error::Error;
-use hashcash::{Token, ParseError};
-use std::string::FromUtf8Error;
-use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};
-use tokio_stream::StreamExt;
-use futures::SinkExt;
-use std::time::Duration;
 use std::fs::File;
-use std::io::{BufReader, BufRead};
+use std::io::{BufRead, BufReader};
+
+use futures::SinkExt;
 use rand::seq::IteratorRandom;
+use tokio::io::AsyncWriteExt;
+use tokio::net::{TcpListener, TcpStream};
+use tokio_stream::StreamExt;
+use tokio_util::codec::{Framed, LinesCodec};
 
 const QUOTES_FILENAME: &str = "data/quotes.txt";
 
@@ -31,7 +28,7 @@ async fn handle_message(config: &Config, socket: TcpStream) {
                 println!("request: {}", token);
                 let response = process_token(config, token);
                 println!("response: {}", response);
-                lines.send(response).await;
+                lines.send(response).await.expect("error sending response");
             }
             Err(_) => {}
         }
@@ -51,7 +48,7 @@ fn process_token(config: &Config, token: String) -> &str {
                 config.quotes.iter().choose(&mut rand::thread_rng()).expect("no quotes")
             }
         }
-        Err(e) => "BAD_TOKEN"
+        Err(_) => "BAD_TOKEN"
     }
 }
 
@@ -60,7 +57,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let addr = env::args()
         .nth(1)
         .unwrap_or_else(|| "127.0.0.1:8080".to_string());
-    println!("{}", env::current_dir()?.display());
     let quotes_file = File::open(QUOTES_FILENAME)
         .expect("can't open quotes file");
     let lines = BufReader::new(quotes_file)
@@ -68,7 +64,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .map(|l| l.expect("error reading line"))
         .collect();
 
-    let mut config = Config {
+    let config = Config {
         resource: String::from("quote"),
         complexity_bits: 5,
         quotes: lines,
