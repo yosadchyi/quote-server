@@ -48,6 +48,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // no more data will be sent, shutdown write connection
     stream.shutdown().await.expect("error shutting down write connection");
 
+    // receive quotes
     let mut lines= Framed::new(stream, LinesCodec::new());
     while let Some(result) = lines.next().await {
         match result {
